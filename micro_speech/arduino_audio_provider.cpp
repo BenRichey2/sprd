@@ -19,8 +19,20 @@ limitations under the License.
 
 #ifndef ARDUINO_EXCLUDE_CODE
 
+#ifndef PPI_CHANNEL
+#define PPI_CHANNEL (7)
+#endif
+
 #ifndef ANALOG_PIN
 #define ANALOG_PIN A0
+#endif
+
+#ifndef ADC_BUFFER_SIZE
+#define ADC_BUFFER_SIZE 1
+#endif
+
+#ifndef SAMPLING_FREQUENCY
+#define SAMPLING_FREQUENCY 20000
 #endif
 
 #include <algorithm>
@@ -42,7 +54,7 @@ using namespace test_over_serial;
 namespace {
 bool g_is_audio_initialized = false;
 // An internal buffer able to fit 16x our sample size
-constexpr int kAudioCaptureBufferSize = DEFAULT_PDM_BUFFER_SIZE * 16;
+constexpr int kAudioCaptureBufferSize = DEFAULT_PDM_BUFFER_SIZE * 32;
 int16_t g_audio_capture_buffer[kAudioCaptureBufferSize];
 // A buffer that holds our output
 int16_t g_audio_output_buffer[kMaxAudioSampleSize];
@@ -53,26 +65,131 @@ volatile int32_t g_latest_audio_timestamp = 0;
 uint32_t g_test_sample_index;
 // test_over_serial silence insertion flag
 bool g_test_insert_silence = true;
-// Sampling period in us
-unsigned long sampling_period_us = (1.0 / kAudioSampleFrequency) * pow(10.0, 6);
 // Thread to continuously read in audio data
 rtos::Thread audio_capture_thread;
+// Debug
+volatile int num_captures = 0;
+volatile bool adcFlag = false;
+volatile nrf_saadc_value_t adcBuffer[ADC_BUFFER_SIZE];
+volatile int dataBufferIndex = 0;
 }  // namespace
 
-/*
-* Reads <size> bytes of data from <ANALOG_PIN> using an
-* 8-bit ADC at a sampling rate of <kAudioSampleFrequency>
-* to <buffer>.
-*/
-int audio_read(int16_t *buffer, size_t size) {
-  for (int i = 0; i < size; i++) {
-    unsigned long new_time = micros();
-    uint8_t val = analogRead(ANALOG_PIN);
-    buffer[i] = val;
-    while(micros() < (new_time + sampling_period_us));
-      //yield();
+extern "C" void SAADC_IRQHandler_v( void )
+{
+  if ( NRF_SAADC->EVENTS_END != 0 )
+  {
+    NRF_SAADC->EVENTS_END = 0;
+    adcFlag = true;
   }
-  return size;
+}
+
+void initADC()
+{
+  nrf_saadc_disable();
+
+  NRF_SAADC->RESOLUTION = NRF_SAADC_RESOLUTION_12BIT;
+
+  NRF_SAADC->CH[2].CONFIG = ( SAADC_CH_CONFIG_GAIN_Gain1_4    << SAADC_CH_CONFIG_GAIN_Pos ) |
+                            ( SAADC_CH_CONFIG_MODE_SE         << SAADC_CH_CONFIG_MODE_Pos ) |
+                            ( SAADC_CH_CONFIG_REFSEL_VDD1_4   << SAADC_CH_CONFIG_REFSEL_Pos ) |
+                            ( SAADC_CH_CONFIG_RESN_Bypass     << SAADC_CH_CONFIG_RESN_Pos ) |
+                            ( SAADC_CH_CONFIG_RESP_Bypass     << SAADC_CH_CONFIG_RESP_Pos ) |
+                            ( SAADC_CH_CONFIG_TACQ_3us        << SAADC_CH_CONFIG_TACQ_Pos );
+
+  NRF_SAADC->CH[2].PSELP = SAADC_CH_PSELP_PSELP_AnalogInput2 << SAADC_CH_PSELP_PSELP_Pos;
+  NRF_SAADC->CH[2].PSELN = SAADC_CH_PSELN_PSELN_NC << SAADC_CH_PSELN_PSELN_Pos;
+
+  NRF_SAADC->RESULT.MAXCNT = ADC_BUFFER_SIZE;
+  NRF_SAADC->RESULT.PTR = ( uint32_t )&adcBuffer;
+
+  NRF_SAADC->EVENTS_END = 0;
+  nrf_saadc_int_enable( NRF_SAADC_INT_END );
+  NVIC_SetPriority( SAADC_IRQn, 1UL );
+  NVIC_EnableIRQ( SAADC_IRQn );
+
+  nrf_saadc_enable();
+
+  NRF_SAADC->TASKS_CALIBRATEOFFSET = 1;
+  while ( NRF_SAADC->EVENTS_CALIBRATEDONE == 0 );
+  NRF_SAADC->EVENTS_CALIBRATEDONE = 0;
+  while ( NRF_SAADC->STATUS == ( SAADC_STATUS_STATUS_Busy << SAADC_STATUS_STATUS_Pos ) );
+}
+
+void initTimer4()
+{
+  NRF_TIMER4->MODE = TIMER_MODE_MODE_Timer;
+  NRF_TIMER4->BITMODE = TIMER_BITMODE_BITMODE_16Bit;
+  NRF_TIMER4->SHORTS = TIMER_SHORTS_COMPARE0_CLEAR_Enabled << TIMER_SHORTS_COMPARE0_CLEAR_Pos;
+  NRF_TIMER4->PRESCALER = 0;
+  NRF_TIMER4->CC[0] = 16000000 / SAMPLING_FREQUENCY; // Needs prescaler set to 0 (1:1) 16MHz clock
+}
+
+void startTimer4()
+{
+  NRF_TIMER4->TASKS_START = 1;
+}
+
+void stopTimer4()
+{
+  NRF_TIMER4->TASKS_STOP = 1;
+}
+
+void initPPI()
+{
+  NRF_PPI->CH[PPI_CHANNEL].EEP = ( uint32_t )&NRF_TIMER4->EVENTS_COMPARE[0];
+  NRF_PPI->CH[PPI_CHANNEL].TEP = ( uint32_t )&NRF_SAADC->TASKS_START;
+  NRF_PPI->FORK[PPI_CHANNEL].TEP = ( uint32_t )&NRF_SAADC->TASKS_SAMPLE;
+  NRF_PPI->CHENSET = ( 1UL << PPI_CHANNEL );
+}
+
+int32_t copyData()
+{
+  g_audio_capture_buffer[dataBufferIndex] = adcBuffer[0];
+  dataBufferIndex = ( dataBufferIndex + 1 ) % kAudioCaptureBufferSize;
+  return dataBufferIndex;
+}
+
+int audio_read() {
+  enum APP_STATE_TYPE { APP_WAIT_FOR_START,
+                        APP_START_MEASUREMENT,
+                        APP_COLLECT_SAMPLES,
+                        APP_STOP_MEASUREMENT,
+                        APP_STATE_RESTART = 255
+                      };
+
+  static uint32_t state = 0;
+  bool stop = false;
+  while (!stop) {
+    switch (state)
+    {
+      case APP_WAIT_FOR_START:
+        state++;
+        break;
+      case APP_START_MEASUREMENT:
+        startTimer4();
+        state++;
+        break;
+      case APP_COLLECT_SAMPLES:
+        if (adcFlag)
+        {
+          if ((copyData() % DEFAULT_PDM_BUFFER_SIZE) == 0)
+          {
+            state++;
+          }
+          adcFlag = false;
+        }
+        break;
+      case APP_STOP_MEASUREMENT:
+        stopTimer4();
+        state++;
+        break;
+      default:
+        state = 0;
+        stop = true;
+        break;
+    }
+  }
+  return DEFAULT_PDM_BUFFER_SIZE;
 }
 
 void CaptureSamples() {
@@ -90,13 +207,17 @@ void CaptureSamples() {
       // Determine the index of this sample in our ring buffer
       const int capture_index = start_sample_offset % kAudioCaptureBufferSize;
       // Read the data to the correct place in our buffer
-      //MicroPrintf("Capturing %d new bytes of audio data", number_of_samples);
-      int num_read =
-          audio_read(g_audio_capture_buffer + capture_index, DEFAULT_PDM_BUFFER_SIZE);
+      int num_read = audio_read();
       if (num_read != DEFAULT_PDM_BUFFER_SIZE) {
         MicroPrintf("### short read (%d/%d) @%dms", num_read,
                     DEFAULT_PDM_BUFFER_SIZE, time_in_ms);
         }
+      if (num_captures < 33)
+        num_captures++;
+      else {
+        MicroPrintf("Just captured 1s of audio");
+        num_captures = 0;
+      }
       // This is how we let the outside world know that new audio data has arrived.
       g_latest_audio_timestamp = time_in_ms;
   }
@@ -105,7 +226,10 @@ void CaptureSamples() {
 
 TfLiteStatus InitAudioRecording() {
   if (!g_is_audio_initialized) {
-    analogReadResolution(8);
+    //analogReadResolution(8);
+    initADC();
+    initTimer4();
+    initPPI();
     audio_capture_thread.start(mbed::callback(CaptureSamples));
     /*
     // Hook up the callback that will be called with each sample
