@@ -14,14 +14,13 @@ unsigned long SAMPLING_PERIOD_US = ((1.0 / AUDIO_SAMPLE_FREQUENCY) * pow(10.0, 6
 * <ADC_RESOLUTION>-bit ADC at a sampling rate of <AUDIO_SAMPLE_FREQUENCY>
 * to <buffer>.
 */
-int audio_read(int16_t *buffer, size_t size) {
+void audio_read(int16_t *buffer, size_t size) {
   for (int i = 0; i < size; i++) {
     unsigned long new_time = micros();
     uint16_t val = analogRead(ANALOG_PIN);
     buffer[i] = val;
     while(micros() < (new_time + SAMPLING_PERIOD_US));
   }
-  return size;
 }
 
 void setup() {

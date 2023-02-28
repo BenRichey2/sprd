@@ -3,12 +3,15 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include "AudioFile.h"
 
-#define NUM_CHANNELS 2
-#define SAMPLING_FREQ 16000
+#define NUM_CHANNELS 1
+#define SAMPLING_FREQ 12000
 #define BIT_DEPTH 16
+#define LENGTH_IN_S 1
+#define GAIN 1000
 
 
 int main()
@@ -44,16 +47,14 @@ int main()
     // Create audio file and load audio data into it
     AudioFile<float> a_file;
     a_file.setNumChannels(NUM_CHANNELS);
-    a_file.setNumSamplesPerChannel(SAMPLING_FREQ);
+    a_file.setNumSamplesPerChannel(LENGTH_IN_S * SAMPLING_FREQ);
     a_file.setSampleRate(SAMPLING_FREQ);
     a_file.setBitDepth(BIT_DEPTH);
     for (int channel = 0; channel < a_file.getNumChannels(); channel++) {
         for (int i = 0; i < a_file.getNumSamplesPerChannel(); i++) {
-            a_file.samples[channel][i] = raw_data[i];
+            a_file.samples[channel][i] = GAIN * raw_data[i];
         }
     }
-
-
     // Prompt user to enter where they want to save the file
     std::cout << "Enter file name to store .wav file to: ";
     if (std::cin.peek() == '\n') std::cin.ignore();
