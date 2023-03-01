@@ -32,15 +32,13 @@ limitations under the License.
 #endif
 
 #ifndef SAMPLING_FREQUENCY
-#define SAMPLING_FREQUENCY 20000
+#define SAMPLING_FREQUENCY 16000
 #endif
 
 #include <algorithm>
 #include <cmath>
 
 #include <mbed.h>
-#include <rtos.h>
-#include <platform/Callback.h>
 
 #include "PDM.h"
 #include "audio_provider.h"
@@ -65,24 +63,38 @@ volatile int32_t g_latest_audio_timestamp = 0;
 uint32_t g_test_sample_index;
 // test_over_serial silence insertion flag
 bool g_test_insert_silence = true;
-// Thread to continuously read in audio data
-rtos::Thread audio_capture_thread;
 // Debug
 volatile int num_captures = 0;
-volatile bool adcFlag = false;
 volatile nrf_saadc_value_t adcBuffer[ADC_BUFFER_SIZE];
 volatile int dataBufferIndex = 0;
 }  // namespace
 
+// This is the callback that is executed every time
+// the timer throws an interrupt. The ADC is running continuously
+// and asynchronously from the CPU. Simply copy a value from the ADC
+// to our audio buffer and increment the buffer index.
 extern "C" void SAADC_IRQHandler_v( void )
 {
-  if ( NRF_SAADC->EVENTS_END != 0 )
+  if (NRF_SAADC->EVENTS_END != 0)
   {
     NRF_SAADC->EVENTS_END = 0;
-    adcFlag = true;
+    g_audio_capture_buffer[dataBufferIndex] = adcBuffer[0];
+    dataBufferIndex = (dataBufferIndex + 1) % kAudioCaptureBufferSize;
+    // Every ~30ms (512 samples taken), update the latest audio timestamp
+    // to notify the main thread that we've received enough audio data
+    // to begin processing
+    if (dataBufferIndex % DEFAULT_PDM_BUFFER_SIZE == 0) {
+      // This is how we let the main thread know that ~30ms of new audio
+      // has been received
+      g_latest_audio_timestamp =
+          g_latest_audio_timestamp +
+          (DEFAULT_PDM_BUFFER_SIZE / (kAudioSampleFrequency / 1000));
+    }
   }
 }
 
+// Initialize the analog to digital converter (ADC)
+// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.ps.v1.1%2Fsaadc.html
 void initADC()
 {
   nrf_saadc_disable();
@@ -115,6 +127,9 @@ void initADC()
   while ( NRF_SAADC->STATUS == ( SAADC_STATUS_STATUS_Busy << SAADC_STATUS_STATUS_Pos ) );
 }
 
+// Initialize a timer that triggers an interrupt every
+// 1 / <SAMPLING_FREQUENCY> seconds.
+// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.ps.v1.1%2Fppi.html
 void initTimer4()
 {
   NRF_TIMER4->MODE = TIMER_MODE_MODE_Timer;
@@ -124,16 +139,18 @@ void initTimer4()
   NRF_TIMER4->CC[0] = 16000000 / SAMPLING_FREQUENCY; // Needs prescaler set to 0 (1:1) 16MHz clock
 }
 
+// Start the timer to trigger our interrupt function
+// that reads data from the ADC
 void startTimer4()
 {
   NRF_TIMER4->TASKS_START = 1;
 }
 
-void stopTimer4()
-{
-  NRF_TIMER4->TASKS_STOP = 1;
-}
-
+// Initialize the Programmable Peripheral Interconnect (PPI)
+// This allows us to have the ADC run separately from the CPU
+// and trigger an interrupt when its time to copy a sample from
+// the ADC to program memory.
+// https://infocenter.nordicsemi.com/index.jsp?topic=%2Fcom.nordic.infocenter.nrf52832.ps.v1.1%2Fppi.html
 void initPPI()
 {
   NRF_PPI->CH[PPI_CHANNEL].EEP = ( uint32_t )&NRF_TIMER4->EVENTS_COMPARE[0];
@@ -142,103 +159,12 @@ void initPPI()
   NRF_PPI->CHENSET = ( 1UL << PPI_CHANNEL );
 }
 
-int32_t copyData()
-{
-  g_audio_capture_buffer[dataBufferIndex] = adcBuffer[0];
-  dataBufferIndex = ( dataBufferIndex + 1 ) % kAudioCaptureBufferSize;
-  return dataBufferIndex;
-}
-
-int audio_read() {
-  enum APP_STATE_TYPE { APP_WAIT_FOR_START,
-                        APP_START_MEASUREMENT,
-                        APP_COLLECT_SAMPLES,
-                        APP_STOP_MEASUREMENT,
-                        APP_STATE_RESTART = 255
-                      };
-
-  static uint32_t state = 0;
-  bool stop = false;
-  while (!stop) {
-    switch (state)
-    {
-      case APP_WAIT_FOR_START:
-        state++;
-        break;
-      case APP_START_MEASUREMENT:
-        startTimer4();
-        state++;
-        break;
-      case APP_COLLECT_SAMPLES:
-        if (adcFlag)
-        {
-          if ((copyData() % DEFAULT_PDM_BUFFER_SIZE) == 0)
-          {
-            state++;
-          }
-          adcFlag = false;
-        }
-        break;
-      case APP_STOP_MEASUREMENT:
-        stopTimer4();
-        state++;
-        break;
-      default:
-        state = 0;
-        stop = true;
-        break;
-    }
-  }
-  return DEFAULT_PDM_BUFFER_SIZE;
-}
-
-void CaptureSamples() {
-    // This is how many bytes of new data we have each time this is called
-    // const int number_of_samples = DEFAULT_PDM_BUFFER_SIZE / 2;
-    const int number_of_samples = DEFAULT_PDM_BUFFER_SIZE;
-    while (true) {
-      // Calculate what timestamp the last audio sample represents
-      const int32_t time_in_ms =
-          g_latest_audio_timestamp +
-          (number_of_samples / (kAudioSampleFrequency / 1000));
-      // Determine the index, in the history of all samples, of the last sample
-      const int32_t start_sample_offset =
-          g_latest_audio_timestamp * (kAudioSampleFrequency / 1000);
-      // Determine the index of this sample in our ring buffer
-      const int capture_index = start_sample_offset % kAudioCaptureBufferSize;
-      // Read the data to the correct place in our buffer
-      int num_read = audio_read();
-      if (num_read != DEFAULT_PDM_BUFFER_SIZE) {
-        MicroPrintf("### short read (%d/%d) @%dms", num_read,
-                    DEFAULT_PDM_BUFFER_SIZE, time_in_ms);
-        }
-      if (num_captures < 33)
-        num_captures++;
-      else {
-        MicroPrintf("Just captured 1s of audio");
-        num_captures = 0;
-      }
-      // This is how we let the outside world know that new audio data has arrived.
-      g_latest_audio_timestamp = time_in_ms;
-  }
-}
-
-
 TfLiteStatus InitAudioRecording() {
   if (!g_is_audio_initialized) {
-    //analogReadResolution(8);
     initADC();
     initTimer4();
     initPPI();
-    audio_capture_thread.start(mbed::callback(CaptureSamples));
-    /*
-    // Hook up the callback that will be called with each sample
-    PDM.onReceive(CaptureSamples);
-    // Start listening for audio: MONO @ 16KHz
-    PDM.begin(1, kAudioSampleFrequency);
-    // gain: -20db (min) + 6.5db (13) + 3.2db (builtin) = -10.3db
-    PDM.setGain(13);
-    */
+    startTimer4();
     // Block until we have our first audio sample
     while (!g_latest_audio_timestamp) {
     }
