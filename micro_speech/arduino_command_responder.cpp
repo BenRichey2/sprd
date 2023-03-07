@@ -23,6 +23,11 @@ limitations under the License.
 #include "command_responder.h"
 #include "tensorflow/lite/micro/micro_log.h"
 
+#include "PluggableUSBHID.h"
+#include "USBKeyboard.h"
+
+USBKeyboard Keyboard;
+
 // Toggles the built-in LED every inference, and lights a colored LED depending
 // on which word was detected.
 void RespondToCommand(int32_t current_time, const char* found_command,
@@ -56,6 +61,9 @@ void RespondToCommand(int32_t current_time, const char* found_command,
       digitalWrite(LEDG, LOW);  // Green for yes
     } else if (found_command[0] == 'n') {
       digitalWrite(LEDR, LOW);  // Red for no
+      // Hit space bar
+      Serial.println("Spacebar");
+      Keyboard.key_code(0x20, 0);
     } else if (found_command[0] == 'u') {
       digitalWrite(LEDB, LOW);  // Blue for unknown
     } else {
