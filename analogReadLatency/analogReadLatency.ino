@@ -19,11 +19,14 @@ void audio_read() {
 }
 
 void loop() {
-
+/*
   unsigned long start, duration;
   start = millis();
   audio_read();
   duration = millis() - start;
   Serial.println(duration);
+  */
+  Serial.println(analogRead(ANALOG_PIN));
+  delay(3);
 
 }
