@@ -1,0 +1,30 @@
+DATA_DIR="/root/data"
+WANTED_WORDS="up,down"
+SILENT_PERCENTAGE=25
+UNKNOWN_PERCENTAGE=25
+PREPROCESS="micro"
+WINDOW_STRIDE=20
+MODEL_ARCHITECTURE="tiny_conv"
+TRAINING_STEPS="12000,3000"
+LEARNING_RATE="0.001,0.0001"
+TRAIN_DIR="/root/train"
+LOGS_DIR="/root/logs"
+VERBOSITY="WARN"
+EVAL_STEP_INTERVAL="1000"
+SAVE_STEP_INTERVAL="1000"
+
+python3 tensorflow/tensorflow/examples/speech_commands/train.py \
+--data_dir=$DATA_DIR \
+--wanted_words=$WANTED_WORDS \
+--silence_percentage=$SILENT_PERCENTAGE \
+--unknown_percentage=$UNKNOWN_PERCENTAGE \
+--preprocess=$PREPROCESS \
+--window_stride=$WINDOW_STRIDE \
+--model_architecture=$MODEL_ARCHITECTURE \
+--how_many_training_steps=$TRAINING_STEPS \
+--learning_rate=$LEARNING_RATE \
+--train_dir=$TRAIN_DIR \
+--summaries_dir=$LOGS_DIR \
+--verbosity=$VERBOSITY \
+--eval_step_interval=$EVAL_STEP_INTERVAL \
+--save_step_interval=$SAVE_STEP_INTERVAL
