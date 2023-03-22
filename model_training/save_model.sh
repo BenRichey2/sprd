@@ -1,7 +1,7 @@
 WANTED_WORDS="up,down"
 WINDOW_STRIDE=20
 PREPROCESS="micro"
-MODEL_ARCHITECTURE="tiny_conv"
+MODEL_ARCHITECTURE="tiny_embedding_conv"
 TRAIN_DIR="/root/train/"
 MODEL_DIR="/root/models/"
 START_CHECKPOINT="15000"
