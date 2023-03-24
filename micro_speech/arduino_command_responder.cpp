@@ -52,12 +52,23 @@ void RespondToCommand(int32_t current_time, const char* found_command,
     digitalWrite(LEDG, HIGH);
     digitalWrite(LEDB, HIGH);
 
-    if (found_command[0] == 'u' && found_command[1] == 'p') {
-      digitalWrite(LEDG, LOW);  // Green for up
+    if (found_command[1] == 'p') {
+      // Green for up
+      digitalWrite(LEDG, LOW);
     } else if (found_command[0] == 'd') {
-      digitalWrite(LEDR, LOW);  // Red for down
+      // Red for down
+      digitalWrite(LEDR, LOW);
+    } else if (found_command[0] == 'l') {
+      // Purple for left
+      digitalWrite(LEDR, LOW);
+      digitalWrite(LEDB, LOW);
+    } else if (found_command[0] == 'r') {
+      // Yellow for right
+      digitalWrite(LEDG, LOW);
+      digitalWrite(LEDR, LOW);
     } else if (found_command[1] == 'n') {
-      digitalWrite(LEDB, LOW);  // Blue for unknown
+      // Blue for unknown
+      digitalWrite(LEDB, LOW);
     } else {
       // silence
     }

@@ -1,4 +1,4 @@
-WANTED_WORDS="up,down"
+WANTED_WORDS="up,down,left,right"
 WINDOW_STRIDE=20
 PREPROCESS="micro"
 MODEL_ARCHITECTURE="tiny_conv"

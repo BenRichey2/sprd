@@ -1,5 +1,5 @@
 DATA_DIR="/root/data"
-WANTED_WORDS="up,down"
+WANTED_WORDS="up,down,left,right"
 SILENT_PERCENTAGE=25
 UNKNOWN_PERCENTAGE=25
 PREPROCESS="micro"

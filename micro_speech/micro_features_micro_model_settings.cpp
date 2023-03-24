@@ -20,4 +20,6 @@ const char* kCategoryLabels[kCategoryCount] = {
     "unknown",
     "up",
     "down",
+    "left",
+    "right",
 };
