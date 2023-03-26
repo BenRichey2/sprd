@@ -2,11 +2,12 @@
 #define PPI_CHANNEL (7)
 #define ADC_BUFFER_SIZE 1
 #define SAMPLING_FREQUENCY 16000
+#define RECORDING_LEN_S 5
 
 #include <mbed.h>
 
-
-int16_t g_audio_capture_buffer[SAMPLING_FREQUENCY];
+const unsigned int BUFF_SIZE = RECORDING_LEN_S * SAMPLING_FREQUENCY;
+int16_t g_audio_capture_buffer[BUFF_SIZE];
 volatile nrf_saadc_value_t adcBuffer[ADC_BUFFER_SIZE];
 volatile int dataBufferIndex = 0;
 volatile bool done = false;
@@ -21,7 +22,7 @@ extern "C" void SAADC_IRQHandler_v( void )
   {
     NRF_SAADC->EVENTS_END = 0;
     g_audio_capture_buffer[dataBufferIndex] = adcBuffer[0];
-    dataBufferIndex = (dataBufferIndex + 1) % SAMPLING_FREQUENCY;
+    dataBufferIndex = (dataBufferIndex + 1) % BUFF_SIZE;
     if (dataBufferIndex == 0) {
       stopTimer4();
       done = true;
@@ -105,10 +106,11 @@ void setup() {
   initADC();
   initTimer4();
   initPPI();
+  delay(3000);
 }
 
 void loop() {
-  Serial.print("Record 1s of audio data? (y/n): ");
+  Serial.print("Record 5s of audio data? (y/n): ");
   while(!Serial.available());
   Serial.println("");
   char input = Serial.read();
@@ -119,11 +121,10 @@ void loop() {
     done = false;
     Serial.println("Done.");
     Serial.println("Outputting raw CSV audio data:");
-    for (int i = 0; i < SAMPLING_FREQUENCY - 1; i++) {
-      delay(2);
+    for (int i = 0; i < BUFF_SIZE - 1; i++) {
       Serial.print((float) g_audio_capture_buffer[i]);
       Serial.print(",");
     }
-    Serial.println((float) g_audio_capture_buffer[SAMPLING_FREQUENCY - 1]);
+    Serial.println((float) g_audio_capture_buffer[BUFF_SIZE - 1]);
   }
 }
