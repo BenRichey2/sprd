@@ -8,10 +8,10 @@
 #include "AudioFile.h"
 
 #define NUM_CHANNELS 1
-#define SAMPLING_FREQ 12000
+#define SAMPLING_FREQ 16000
 #define BIT_DEPTH 16
 #define LENGTH_IN_S 1
-#define GAIN 1000
+#define GAIN 1
 
 
 int main()
@@ -42,6 +42,14 @@ int main()
     if (raw_data.size() < SAMPLING_FREQ) {
         std::cout << "Error: Not enough data in CSV file." << std::endl;
         return -1;
+    }
+
+    // Find the maximum value in the vector for normalization
+    auto it = max_element(std::begin(raw_data), std::end(raw_data));
+    float max = *it;
+    // Normalize the data
+    for (int i = 0; i < raw_data.size(); i++) {
+        raw_data[i] = raw_data[i] / max;
     }
 
     // Create audio file and load audio data into it
