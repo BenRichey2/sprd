@@ -22,6 +22,12 @@ limitations under the License.
 #include "Arduino.h"
 #include "command_responder.h"
 #include "tensorflow/lite/micro/micro_log.h"
+#include "PluggableUSBHID.h"
+#include "USBKeyboard.h"
+
+
+USBKeyboard Keyboard;
+
 
 // Toggles the built-in LED every inference, and lights a colored LED depending
 // on which word was detected.
@@ -54,8 +60,10 @@ void RespondToCommand(int32_t current_time, const char* found_command,
 
     if (found_command[1] == 'p') {
       digitalWrite(LEDG, LOW);  // Green for up
+      Keyboard.key_code(0x20, 0);
     } else if (found_command[0] == 'd') {
       digitalWrite(LEDR, LOW);  // Red for down
+      Keyboard.key_code(DOWN_ARROW);
     } else if (found_command[1] == 'n') {
       digitalWrite(LEDB, LOW);  // Blue for unknown
     } else {
