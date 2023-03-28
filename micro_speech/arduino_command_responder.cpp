@@ -52,11 +52,11 @@ void RespondToCommand(int32_t current_time, const char* found_command,
     digitalWrite(LEDG, HIGH);
     digitalWrite(LEDB, HIGH);
 
-    if (found_command[0] == 'y') {
-      digitalWrite(LEDG, LOW);  // Green for yes
-    } else if (found_command[0] == 'n') {
-      digitalWrite(LEDR, LOW);  // Red for no
-    } else if (found_command[0] == 'u') {
+    if (found_command[1] == 'p') {
+      digitalWrite(LEDG, LOW);  // Green for up
+    } else if (found_command[0] == 'd') {
+      digitalWrite(LEDR, LOW);  // Red for down
+    } else if (found_command[1] == 'n') {
       digitalWrite(LEDB, LOW);  // Blue for unknown
     } else {
       // silence
