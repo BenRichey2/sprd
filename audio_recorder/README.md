@@ -79,3 +79,8 @@ produced.
 
 https://youtu.be/DFpCMg7WAwo
 
+## Attributions
+
+Thanks to Adam Stark for providing an easy to use, standalone C++
+library for creating .wav files. You can find the project [here](https://github.com/adamstark/AudioFile)
+
