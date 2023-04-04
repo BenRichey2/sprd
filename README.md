@@ -174,7 +174,7 @@ connected via USB.
 
 ## Attributions
 
-SPRD is a senior design project by Ben Richey, Isabella Bowling, Tofumi
+SPRD is a senior design project by Ben Richey, Isabella Bowling, Oluwatofunmi
 Oyetan, and Trey Boggess. The project was sponsored by Dr. Sayed Ahmad
 Salehi and Dr. Michael T. Johnson. Thanks to our sponsors for their
 guidance and funding. Also, thanks to Dr. Regina Hannemann, Dr. Samson
