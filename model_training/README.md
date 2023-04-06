@@ -129,3 +129,56 @@ be sure to save the changes and rebuild the docker image before beginning a new
 training session for your alterations to take effect. Certain parameters are
 common to the `train_model.sh`, `save_model.sh`, and `tf_to_tflite.py`
 programs, so if you make changes, be sure to update all three.
+
+## Adding Your Own Training Data
+
+Recording your own data using the SPRD device and adding it to the training set
+can improve the performance of the SPRD device in terms of accuracy. Follow
+these instructions to do so.
+
+1. Follow the steps in the README file of the `audio_recorder` folder to collect
+your own audio recordings. You should record as many samples as you have time
+for, and try to say the keyword once every second.
+
+2. Next, you'll need to separate the samples into 1 second clips. Since
+`audio_recorder` records 5 second clips, you'll need to manually separate these
+into 1 second samples. I recommend downloading
+[Audacity](https://www.audacityteam.org/). It's a free and open-source audio
+editing software. Use that to separate your 5 second clip into distinct clips
+that are 1 second or less where the keyword is spoken only 1 time per clip. Save
+each of these 1 second or less clips as their own waveform file.
+
+3. Due to the way the audio samples are pre-processed during the training phase,
+you must name each sample according to the following convention:
+`<speaker_name>_nohash_<num>.wav`, where `<speaker_name>` is the name of the
+person who was recorded (an alias, or nickname will do, it just needs to be
+uniquely identifying) and `<num>` indicates the sample number. For example, if
+Bobby spoke a keyword 5 times, there would be 5 clips that are 1 second or less
+with the names `Bobby_nohash_0.wav`, `Bobby_nohash_1.wav`, ...,
+`Bobby_nohash_4.wav`.
+
+4. For each keyword that you record data, you should create a folder in the
+`model_training/custom_data` folder where the name is the keyword. For example,
+if you recorded examples of people saying the word "up", you would create a
+folder called `up`. Then, you should store all examples of "up" in the newly
+created folder. Continuing the Bobby example from step 3, your folder structure
+should look like this:
+```
+    sprd/
+        model_training/
+            custom_data/
+                up/
+                    - Bobby_nohash_0.wav
+                    - Bobby_nohash_1.wav
+                    - Bobby_nohash_2.wav
+                    - Bobby_nohash_3.wav
+                    - Bobby_nohash_4.wav
+```
+
+5. Once you have all of your training data prepared and stored in the
+`custom_data` folder, you will need to rebuild the docker image as described in
+the `Building the Docker Image` section of this document. Then, you can follow
+the steps in this document to train a model, and your data will be added to the
+training set! Hopefully this newly trained model will perform better on your
+device.
+

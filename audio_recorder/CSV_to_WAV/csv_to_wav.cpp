@@ -10,7 +10,7 @@
 #define NUM_CHANNELS 1
 #define SAMPLING_FREQ 16000
 #define BIT_DEPTH 16
-#define LENGTH_IN_S 1
+#define LENGTH_IN_S 5
 #define GAIN 1
 
 
