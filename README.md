@@ -69,6 +69,10 @@ The only other piece of hardware on for the SPRD device is an
 It is simplest to start with using a breadboard and jumper wires to
 connect the Arduino to the microphone module.
 
+#### Wiring Schematic
+
+![Wiring Schematic](./media/wiring_schematic.png)
+
 #### Wiring Instructions
 
 1. Connect the "Out" pin of the microphone to analog pin A0 on the
