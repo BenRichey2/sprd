@@ -107,6 +107,16 @@ limitations in the hardware and software, the latency and accuracy of
 the device makes this quite difficult. Future work would be to try to
 optimize the application to reduce latency and/or improve accuracy.
 
+### Usage Instructions
+
+We recommend you use the [Arduino IDE](https://www.arduino.cc/en/software) to
+build and upload the speech recognition application to the SPRD device. Once you
+have done so, you will be ready to play the Chrome Dino game! Simply plug the
+SPRD device into a USB type-A port of your computer and pull up the game. It
+should work with no other set up needed. To get the best accuracy, we recommend
+holding the device ~1 inch from your mouth, and clearly enunciating the "p" in
+"up" and the "n" in "down".
+
 ### `micro_speech` Arduino Sketch
 
 The `micro_speech` folder contains an Arduino sketch provided by Google that has
